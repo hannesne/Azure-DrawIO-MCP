@@ -129,9 +129,34 @@ Generate an Azure architecture diagram showing an AKS cluster with Application G
 Container Registry, Key Vault, and Azure SQL Database
 ```
 
-Or call the MCP tool directly with structured data.
+Or scan your existing codebase:
+
+```
+Scan my workspace and generate an Azure architecture diagram based on my infrastructure code
+```
 
 ## MCP Tools
+
+### `scan_workspace` ⭐ NEW
+
+Automatically scans your codebase to discover Azure resources and generate a diagram.
+
+**Scans for:**
+- Bicep files (`*.bicep`)
+- Terraform files (`*.tf`)
+- ARM templates (`*.json` with ARM schema)
+- Azure SDK usage (`*.cs`, `*.py`, `*.js`, `*.ts`)
+
+**Parameters:**
+- `workspace_dir` (required): Path to scan
+- `generate_diagram`: Auto-generate diagram (default: true)
+- `filename`: Output filename
+- `open_in_vscode`: Open in VS Code after generation
+
+**Example prompt:**
+```
+Scan my project at C:/Projects/my-azure-app and create an architecture diagram
+```
 
 ### `generate_diagram`
 
@@ -251,6 +276,7 @@ azure-drawio-mcp/
 │   ├── server.py             # FastMCP server with tool definitions
 │   ├── drawio_generator.py   # Draw.io file generation using drawpyo
 │   ├── azure_shapes.py       # Azure resource type mappings and styles
+│   ├── scanner.py            # Workspace scanner for auto-discovery
 │   └── models.py             # Pydantic request/response models
 ├── requirements.txt          # Python dependencies
 ├── README.md                 # This file

@@ -7,6 +7,7 @@ Unlike PNG-based diagram generators, the output can be modified in Draw.io or VS
 
 from azure_drawio_mcp_server.drawio_generator import generate_drawio_diagram
 from azure_drawio_mcp_server.azure_shapes import list_all_shapes, AZURE_SHAPES, get_shape_info
+from azure_drawio_mcp_server.scanner import scan_workspace, DiscoveredResource
 from azure_drawio_mcp_server.models import (
     AzureResource,
     Connection,
@@ -19,8 +20,8 @@ from azure_drawio_mcp_server.models import (
     DiagramType,
 )
 from mcp.server.fastmcp import FastMCP
-from pydantic import Field
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
 
 # Create the MCP server
 mcp = FastMCP(
@@ -300,6 +301,126 @@ async def mcp_get_diagram_examples(
         }
     
     return ExampleResponse(examples=examples)
+
+
+class ScanResult(BaseModel):
+    """Result from scanning a workspace for Azure resources."""
+    resources_found: int
+    connections_inferred: int
+    resources: List[Dict]
+    connections: List[Dict]
+    file_types_scanned: List[str]
+    message: str
+
+
+@mcp.tool(name='scan_workspace')
+async def mcp_scan_workspace(
+    workspace_dir: str = Field(
+        ...,
+        description='Path to the workspace directory to scan for Azure resources'
+    ),
+    generate_diagram: bool = Field(
+        True,
+        description='Automatically generate a diagram from discovered resources'
+    ),
+    filename: Optional[str] = Field(
+        None,
+        description='Output filename for the generated diagram (without extension)'
+    ),
+    open_in_vscode: bool = Field(
+        False,
+        description='Open the generated diagram in VS Code'
+    ),
+) -> dict:
+    """Scan a workspace for Azure resources and optionally generate a diagram.
+    
+    Scans for:
+    - Bicep files (*.bicep)
+    - Terraform files (*.tf) 
+    - ARM templates (*.json with ARM schema)
+    - Azure SDK usage in code (*.cs, *.py, *.js, *.ts)
+    
+    Automatically infers connections between resources based on common patterns.
+    """
+    # Scan the workspace
+    resources, connections = await scan_workspace(workspace_dir)
+    
+    # Build result
+    result = {
+        'resources_found': len(resources),
+        'connections_inferred': len(connections),
+        'resources': [
+            {
+                'id': r.id,
+                'resource_type': r.resource_type,
+                'name': r.name,
+                'source_file': r.source_file,
+                'line_number': r.line_number,
+                'rationale': r.rationale,
+            }
+            for r in resources
+        ],
+        'connections': [
+            {'source': c[0], 'target': c[1], 'label': c[2]}
+            for c in connections
+        ],
+        'file_types_scanned': ['*.bicep', '*.tf', '*.json (ARM)', '*.cs', '*.py', '*.js', '*.ts'],
+    }
+    
+    if len(resources) == 0:
+        result['message'] = (
+            'No Azure resources found. Make sure the workspace contains '
+            'Bicep, Terraform, ARM templates, or code using Azure SDKs.'
+        )
+        return result
+    
+    # Generate diagram if requested
+    if generate_diagram:
+        # Convert discovered resources to AzureResource models
+        resource_models = [
+            AzureResource(
+                id=r.id,
+                resource_type=r.resource_type,
+                name=r.name,
+                rationale=r.rationale,
+            )
+            for r in resources
+        ]
+        
+        connection_models = [
+            Connection(source=c[0], target=c[1], label=c[2])
+            for c in connections
+        ]
+        
+        request = DiagramRequest(
+            title='Architecture (Auto-Generated)',
+            resources=resource_models,
+            connections=connection_models,
+            groups=[],
+            workspace_dir=workspace_dir,
+            filename=filename or 'architecture_scan',
+            open_in_vscode=open_in_vscode,
+            show_legend=True,
+        )
+        
+        diagram_result = await generate_drawio_diagram(request)
+        
+        result['diagram'] = {
+            'status': diagram_result.status,
+            'path': diagram_result.path,
+            'message': diagram_result.message,
+        }
+        result['message'] = (
+            f"Found {len(resources)} Azure resources and inferred {len(connections)} connections. "
+            f"Diagram generated at: {diagram_result.path}"
+        )
+    else:
+        result['message'] = (
+            f"Found {len(resources)} Azure resources and inferred {len(connections)} connections. "
+            f"Use generate_diagram=True to create a diagram."
+        )
+    
+    return result
 
 
 def main():
