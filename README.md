@@ -103,7 +103,29 @@ If the extension is not installed, `.drawio` files will open as XML text.
 
 ### 4. Configure MCP Server
 
+#### Option A: Install from GitHub (No Clone Required) ⭐
+
 Add to your VS Code MCP configuration (`~/.vscode/mcp.json` or workspace settings):
+
+```json
+{
+  "mcpServers": {
+    "Azure Draw.io MCP Server": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from", 
+        "git+https://github.com/lilepeeps/Azure-DrawIO-MCP.git",
+        "azure-drawio-mcp"
+      ]
+    }
+  }
+}
+```
+
+> **Note**: Requires `uv` installed. Install with: `pip install uv` or `winget install astral-sh.uv`
+
+#### Option B: Clone and Run Locally
 
 ```json
 {
@@ -114,7 +136,7 @@ Add to your VS Code MCP configuration (`~/.vscode/mcp.json` or workspace setting
       "args": [
         "-m", "azure_drawio_mcp_server.server"
       ],
-      "cwd": "C:/path/to/azure-drawio-mcp"
+      "cwd": "C:/path/to/Azure-DrawIO-MCP"
     }
   }
 }
